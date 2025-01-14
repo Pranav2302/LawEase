@@ -22,9 +22,6 @@ router.post("/signup", signup)
 //route for sending otp to the mail
 router.post("/sendotp", sendotp)
 
-//route for setting profile
-router.post("/setprofile", auth, isProvider, setProfile)
-
 
 // //route for changing password
 // router.post("/changePassword",auth, changePassword)

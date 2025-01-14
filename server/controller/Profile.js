@@ -1,7 +1,9 @@
 const User = require("../models/User");
 const Profile = require("../models/Profile");
 const { uploadToCloudinary } = require("../utils/uploadToCloudinary");
+const { default: axios } = require("axios");
 require("dotenv").config();
+const FormData = require("form-data");
 
 
 //profile set of advocate
@@ -12,7 +14,12 @@ exports.setProfile = async(req,res) => {
   
       //profile pic
       const profilePic = req.files.image;
-  
+      if(!profilePic){
+        return res.status(400).json({
+          success:false,
+          message:"Profile picture is required"
+        })
+      }
       //get details from req.body
       const {
         gender, 
@@ -46,9 +53,50 @@ exports.setProfile = async(req,res) => {
             message: "All fields are required",
           });
         }
+
+        console.log("validated")
+    console.log("district", district.toUpperCase());
       
-      //TODO:verify provider from barcouncil database
-      
+      //capitalize words
+      const capDistrict = district.toUpperCase()
+      const capTaluka = taluka.toUpperCase()
+      const BAR_COUNCIL_API = process.env.BAR_COUNCIL_API
+      const barName = `${capTaluka} TALUKA   BAR ASSOCIATION,   ${capDistrict}`
+        
+      //fetch data from bar council
+      try {
+        //make form data
+        const formData = new FormData();
+        formData.append("barname", barName);
+        
+        //make api call
+        const response = await axios.post(
+            BAR_COUNCIL_API, 
+            formData,
+            {
+                headers: {
+                ...formData.getHeaders(),  
+                }
+            }
+          );
+
+        //find if user is enrolled
+        const advocateList = response.data || [];
+        const isEnrolled = advocateList.some(advocate => advocate.enrollmentNo == enrollmentNumber);
+
+        if(!isEnrolled) {
+            return res.status(400).json({
+                success: false,
+                message: "Enrollment number not found in Bar Council records",
+            })
+        }
+      }
+      catch(error) {
+        return res.status(500).json({
+          success: false,
+          message: "Error while verifying enrollment number with Bar Council",
+        })
+      }
   
   
       //upload to cloudinary
@@ -94,12 +142,14 @@ exports.setProfile = async(req,res) => {
       })
     }
     catch(error) {
+      console.error("Profile Setting Error:", error);
       return res.status(500).json({
         success: false,
         message: "Something went wrong while setting profile",
+        error: error.message  //  to see specific error
       });
     }
-  }
+}
   
-//TODO:verify lawyer
+
   

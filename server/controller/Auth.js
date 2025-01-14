@@ -92,7 +92,12 @@ exports.signup = async (req, res) => {
         message: "All fields are required",
       });
     }
-
+    if(accountType !== "Client" && accountType !== "Provider"){
+      return res.state(400).json({
+        success :false,
+        message:"Invalid account type. Must be either Client or Provider"
+      });
+    }
     //2 password match
     if (password !== confirmPassword) {
       return res.status(400).json({
@@ -110,20 +115,23 @@ exports.signup = async (req, res) => {
       });
     }
 
-    //find most recent otp for user
+    // Find most recent OTP first
     const recentOtp = await OTP.find({ email })
       .sort({ createdAt: -1 })
       .limit(1);
-    console.log(recentOtp);
 
-    //validate OTP
+    console.log("Recent OTP:", recentOtp); //for temp
+    console.log("Submitted OTP:", otp); //temp
+
+    // Validate OTP
     if (recentOtp.length === 0) {
       return res.status(400).json({
         success: false,
         message: "OTP not found",
       });
-    } else if (otp !== recentOtp[0].otp) {
-      //invalid otp
+    } 
+    
+    if (otp !== recentOtp[0].otp) {
       return res.status(400).json({
         success: false,
         message: "Invalid OTP",
@@ -160,16 +168,28 @@ exports.signup = async (req, res) => {
     });
     console.log("user: ", user);
 
-    res.status(200).json({
+    
+    // Generate JWT token after successful signup
+    const token = jwt.sign(
+      { email: user.email, id: user._id, accountType: user.accountType },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "2h",
+      }
+    );
+    // Send response with token
+    return res.status(200).json({
       success: true,
-      message: "User is registered successfully",
-      data: user,
+      message: "User registered successfully",
+      user,
+      token, // Make sure to include the token
     });
   } catch (error) {
-    console.log(error);
+    console.log("Signup error:",error);
     return res.status(500).json({
       success: false,
       message: "User can not be registered",
+      error:error.message,
     });
   }
 };

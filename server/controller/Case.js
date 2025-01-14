@@ -4,48 +4,56 @@ const User = require("../models/User")
 const { uploadToCloudinary } = require("../utils/uploadToCloudinary")
 
 //for client
-exports.createCase = async(req,res) => {
-    console.log(req.body)
+
+exports.createCase = async(req, res) => {
+    console.log("Request body:", req.body);
+    console.log("Request files:", req.files);
     try {
-        const userId = req.user.id
+        const userId = req.user.id;
 
         let {
             description,
             status,
             serviceProvider,
             caseAudio,
-        } = req.body
+        } = req.body;
 
-        const doc = req.files.caseDocument
+        // Check if caseDocument exists in req.files
+        if (!req.files || !req.files.caseDocument) {
+            return res.status(400).json({
+                success: false,
+                message: "Case document is required"
+            });
+        }
 
         if(!description || !serviceProvider || !caseAudio) {
             return res.status(400).json({
                 success: false,
-                message: "All fields are required"
-            })
+                message: "All fields (description, serviceProvider, caseAudio) are required"
+            });
         }
 
         if(!status || status == "undefined") {
-            status = "Open"
+            status = "Open";
         }
 
-       //upload casedocument to cloudinary
+        // Upload casedocument to cloudinary using the utility function
         const caseDocument = await uploadToCloudinary(
-            doc,
+            req.files.caseDocument,
             process.env.FOLDER_NAME
-        )
-        console.log("CaseDocument: ", caseDocument)
+        );
+        console.log("Cloudinary result:", caseDocument);
 
-        //create a new case
+        // Create a new case
         const newCase = await Case.create({
             description,
             status,
             serviceProvider,
             caseAudio,
             caseDocument: caseDocument.secure_url,
-        })
+        });
 
-        //put a case in a user case collection
+        // Put a case in a user case collection
         await User.findByIdAndUpdate(userId,
             {
                 $push: {
@@ -55,7 +63,7 @@ exports.createCase = async(req,res) => {
             {new: true}
         );
 
-        //put case in a pendingCases of a Provider
+        // Put case in a pendingCases of a Provider
         await User.findByIdAndUpdate(
             {
                 _id: serviceProvider
@@ -66,21 +74,21 @@ exports.createCase = async(req,res) => {
                 }
             },
             {new: true}
-        )
-
+        );
 
         return res.status(200).json({
             success: true,
             data: newCase,
             message: "Case created successfully"
-        })
+        });
 
     }
     catch(error) {
-        console.log(error)
-        return res.status(400).json({ success: false, message: "Error while creating case" })
+        console.log("Error in createCase:", error);
+        return res.status(400).json({ success: false, message: "Error while creating case", error: error.message });
     }
-}
+};
+
 
 //for provider
 exports.acceptCase = async(req,res) => {
