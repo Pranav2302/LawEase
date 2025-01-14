@@ -19,6 +19,8 @@ router.post("/login", login)
 //route for client signup
 router.post("/signup", signup)
 
+// new router here
+
 //route for sending otp to the mail
 router.post("/sendotp", sendotp)
 
@@ -28,5 +30,9 @@ router.post("/sendotp", sendotp)
 
 
 
+<<<<<<< HEAD
 
 module.exports = router
+=======
+module.exports = router
+>>>>>>> 61430c9ad2fb89191964dc24665cbe4f9c43bc2c
