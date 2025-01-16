@@ -61,21 +61,22 @@ exports.isClient = async(req,res,next) => {
     }
 }
 
-exports.isProvider = async(req,res, next) => {
-    try{
-        if(req.user.accountType !== "Provider")
-        {
+exports.isProvider = async (req, res, next) => {
+    try {
+        const userDetails = await User.findById(req.user.id);
+        
+        if (userDetails.accountType !== "Provider") {
             return res.status(401).json({
-                success:false,
-                message:"This is protected route for Provider only"
-            })
+                success: false,
+                message: "This is a protected route for Providers only",
+            });
         }
-        next()
+        next();
     }
-    catch(error){
-        res.status(500).json({
-            success:false,
-            message:"Role can not be verified"
-        })
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "User role cannot be verified",
+        });
     }
-}
+};

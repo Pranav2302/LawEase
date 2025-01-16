@@ -89,90 +89,167 @@ exports.createCase = async(req, res) => {
     }
 };
 
+exports.getAllCases = async (req, res) => {
+    try {
+        const providerId = req.user.id;
+
+        // Get pending cases (cases where provider is in pendingCaseRequest)
+        const pendingCases = await Case.find({
+            serviceProvider: providerId,
+            status: "Open"  // or "Pending" based on your status naming
+        }).populate("client", "firstName lastName email");
+
+        // Get accepted cases
+        const acceptedCases = await Case.find({
+            serviceProvider: providerId,
+            status: "In-progress"
+        }).populate("client", "firstName lastName email");
+
+        // Get completed cases
+        const completedCases = await Case.find({
+            serviceProvider: providerId,
+            status: "Completed"
+        }).populate("client", "firstName lastName email");
+
+        return res.status(200).json({
+            success: true,
+            cases: [...pendingCases, ...acceptedCases, ...completedCases]
+        });
+
+    } catch (error) {
+        console.error("Error in getAllCases:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error while fetching cases",
+            error: error.message
+        });
+    }
+};
+
+// Update case status
+exports.updateCaseStatus = async (req, res) => {
+    try {
+        const { caseId, status } = req.body;
+        const providerId = req.user.id;
+
+        if (!caseId || !status) {
+            return res.status(400).json({
+                success: false,
+                message: "Case ID and status are required"
+            });
+        }
+
+        const case_ = await Case.findById(caseId);
+        
+        if (!case_) {
+            return res.status(404).json({
+                success: false,
+                message: "Case not found"
+            });
+        }
+
+        // Verify the provider is authorized to update this case
+        if (case_.serviceProvider.toString() !== providerId) {
+            return res.status(403).json({
+                success: false,
+                message: "Not authorized to update this case"
+            });
+        }
+
+        // Update the case status
+        case_.status = status;
+        await case_.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Case status updated successfully"
+        });
+
+    } catch (error) {
+        console.error("Error in updateCaseStatus:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error while updating case status",
+            error: error.message
+        });
+    }
+};
 
 //for provider
 exports.acceptCase = async(req,res) => {
     try {
-        //take case id
-        const {caseId} = req.body
+        const {caseId} = req.body;
+        const providerId = req.user.id;
 
-        console.log(req.body)
-
-        //take userid
-        const userId = req.user.id
-
-        console.log("userId: ", userId)
-
-        //if caseId missing
         if(!caseId) {
             return res.status(400).json({ 
                 success: false, 
                 message: "Case id is required" 
-            })
+            });
         }
 
-        //find case of that id 
-        const caseData = await Case.findById(caseId)
+        const caseData = await Case.findById(caseId);
 
-        console.log("caseData: ", caseData)
+        if (!caseData) {
+            return res.status(404).json({
+                success: false,
+                message: "Case not found"
+            });
+        }
 
-        //make basic milestone and add to the case
+        // Verify the provider is authorized to accept this case
+        if (caseData.serviceProvider.toString() !== providerId) {
+            return res.status(403).json({
+                success: false,
+                message: "Not authorized to accept this case"
+            });
+        }
+
+        // Create milestones
         const milestone1 = await Milestone.create({
             title: "Case accepted",
             description: "Case is accepted by the service provider",
             status: "Complete",
-        })
-
-        console.log("milestone1: ", milestone1)
+        });
 
         const milestone2 = await Milestone.create({
             title: "Consultation",
             description: "Consultation of proposed case is done",
             status: "Incomplete",
-        })
+        });
 
         const milestone3 = await Milestone.create({
             title: "Case Resolved",
             description: "Case is resolved by the service provider",
             status: "Incomplete",
-        })
+        });
         
-        //push milestones into case
+        // Update case with milestones and status
         await Case.findByIdAndUpdate(caseId, {
             $push: {
                 caseMilestones: { $each: [milestone1._id, milestone2._id, milestone3._id] }
-            }
-        })
-
-        //update status
-        await Case.findByIdAndUpdate(caseId, {
+            },
             status: "In-progress"
-        })
+        });
 
-        //remove from pendingCaseRequest of user
-        await User.findByIdAndUpdate(userId, {
-            $pull: {
-                pendingCaseRequest: caseId
-            }
-        })
-
-        //add to the cases collection of that user
-        await User.findByIdAndUpdate(userId, {
-            $push: {
-                cases: caseData._id
-            }
-        })
+        // Update provider's cases
+        await User.findByIdAndUpdate(providerId, {
+            $pull: { pendingCaseRequest: caseId },
+            $push: { cases: caseId }
+        });
 
         return res.status(200).json({ 
             success: true, 
             message: "Case accepted successfully" 
-        })
+        });
     }
     catch(error) {
-        return res.status(400).json({ 
+        console.error("Error in acceptCase:", error);
+        return res.status(500).json({ 
             success: false, 
-            message: "Error while accepting case" 
-        })
+            message: "Error while accepting case",
+            error: error.message
+        });
     }
-}
+};
 

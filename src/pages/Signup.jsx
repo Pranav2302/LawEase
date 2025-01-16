@@ -5,9 +5,13 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { GoogleLogin } from '@react-oauth/google';
+import { useDispatch } from 'react-redux';
+import { googleAuth } from '@/services/operations/authAPI';
 
 export default function Signup() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [accountType, setAccountType] = useState('user')
   const [otpSent, setOtpSent] = useState(false);
   
@@ -110,47 +114,67 @@ export default function Signup() {
       toast.error(error.message || 'Signup failed');
     }
   };
+  const handleGoogleSuccess = (credentialResponse) => {
+    dispatch(googleAuth(
+      credentialResponse.credential,
+      accountType === 'user' ? 'Client' : 'Provider',
+      navigate
+    ));
+  };
+
+  const handleGoogleError = () => {
+    toast.error("Google sign in failed");
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 mt-14">
-      {/* Left side remains the same */}
-      
+      {/* Left side - Project name and logo */}
+      <div className="w-1/3 bg-gray-950 text-white flex flex-col items-center justify-center p-8">
+        {/* Your existing logo SVG */}
+        <svg version="1.1" className="invert scale-50" xmlns="http://www.w3.org/2000/svg" width="506" height="148">
+          {/* ... your existing SVG paths ... */}
+        </svg>
+      </div>
+  
       {/* Right side - Signup form */}
       <div className="w-2/3 flex items-center justify-center p-8">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-3xl font-bold text-center">
+            <CardTitle className="text-2xl font-bold text-center">
               Create an Account
             </CardTitle>
             <CardDescription className="text-center">
-              Join LawEase today
+              Choose your account type and enter your details to get started.
             </CardDescription>
           </CardHeader>
           <CardContent>
             {/* Account Type Selection */}
-            <div className="flex justify-center mb-6">
-              <div className="inline-flex rounded-md shadow-sm" role="group">
-                <button
-                  type="button"
-                  className={`px-4 py-2 text-sm font-medium rounded-l-lg focus:z-10 focus:ring-2 focus:ring-primary transition-colors ${
-                    accountType === 'user' ? 'bg-black text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                  }`}
-                  onClick={() => setAccountType('user')}
-                >
-                  User
-                </button>
-                <button
-                  type="button"
-                  className={`px-4 py-2 text-sm font-medium rounded-r-lg focus:z-10 focus:ring-2 focus:ring-primary transition-colors ${
-                    accountType === 'Provider' ? 'bg-black text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                  }`}
-                  onClick={() => setAccountType('Provider')}
-                >
-                  Provider
-                </button>
+            <div className="mb-6">
+              <Label>Account Type</Label>
+              <div className="flex mt-2">
+                <div className="inline-flex rounded-md shadow-sm" role="group">
+                  <button
+                    type="button"
+                    className={`px-4 py-2 text-sm font-medium rounded-l-lg focus:z-10 focus:ring-2 focus:ring-primary transition-colors ${
+                      accountType === 'user' ? 'bg-black text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                    }`}
+                    onClick={() => setAccountType('user')}
+                  >
+                    User
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-4 py-2 text-sm font-medium rounded-r-lg focus:z-10 focus:ring-2 focus:ring-primary transition-colors ${
+                      accountType === 'Provider' ? 'bg-black text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                    }`}
+                    onClick={() => setAccountType('Provider')}
+                  >
+                    Provider
+                  </button>
+                </div>
               </div>
             </div>
-
+  
             {/* Step 1: Email and OTP */}
             {!otpSent ? (
               <form onSubmit={handleSendOTP} className="space-y-4">
@@ -192,7 +216,7 @@ export default function Signup() {
                     />
                   </div>
                 </div>
-
+  
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input 
@@ -203,7 +227,7 @@ export default function Signup() {
                     required 
                   />
                 </div>
-
+  
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
                   <Input 
@@ -214,7 +238,7 @@ export default function Signup() {
                     required 
                   />
                 </div>
-
+  
                 <div className="space-y-2">
                   <Label htmlFor="otp">OTP</Label>
                   <Input 
@@ -225,12 +249,47 @@ export default function Signup() {
                     required 
                   />
                 </div>
-
+  
                 <Button className="w-full" type="submit">
                   Sign Up
                 </Button>
               </form>
             )}
+  
+            {/* Google Sign In */}
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
+  
+              <div className="mt-4 flex justify-center">
+              <div className="mt-4 flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="outline"
+                    size="large"
+                    text="continue_with"
+                    shape="rectangular"
+                    useOneTap={false}
+                  />
+                </div>
+              </div>
+            </div>
+  
+            <div className="mt-4 text-center text-sm">
+              Already have an account?{" "}
+              <a href="/login" className="text-primary hover:underline">
+                Login
+              </a>
+            </div>
           </CardContent>
         </Card>
       </div>

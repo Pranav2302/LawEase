@@ -6,11 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast"
-import {useNavigate} from 'react-router-dom'
-import {toast} from 'sonner'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
+import { useSelector } from 'react-redux';
 
 const LawyerProfileForm = () => {
- 
+  const { user } = useSelector((state) => state.profile);
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     gender: '',
@@ -30,16 +31,60 @@ const LawyerProfileForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-
+  // Check if user is provider and hasn't submitted form
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('Please login to continue');
-      navigate('/login');
-      return;
-    }
-    setIsLoading(false);
-  }, [navigate]);
+    const checkAccess = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          toast.error("Please login first");
+          navigate('/login');
+          return;
+        }
+
+        if (!user) {
+          toast.error("User data not found");
+          navigate('/login');
+          return;
+        }
+
+        if (user.accountType !== 'Provider') {
+          toast.error('Only providers can access this page');
+          navigate('/dashboard');
+          return;
+        }
+
+        // Check if provider has already submitted the form
+        const response = await fetch(
+          `${import.meta.env.VITE_BASE_URL}/profile/getProfile`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.profile) {
+          toast.error('You have already submitted the form');
+          navigate('/dashboard');
+          return;
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking access:', error);
+        toast.error(error.message || 'Something went wrong');
+        setIsLoading(false);
+      }
+    };
+
+    checkAccess();
+  }, [user, navigate]);
 
   // Static categories
   const categories = [
@@ -55,20 +100,31 @@ const LawyerProfileForm = () => {
     "Consumer Protection Lawyer"
   ];
 
-  // Fetch existing profile data
-  useEffect(() => {
-   setIsLoading(false);
-  }, []);
-  
- 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error("Please upload an image file");
+        return;
+      }
+      setProfilePic(file);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
   
     try {
       const token = localStorage.getItem('token');
-      console.log('Token being used:', token); // Debug log
-  
       if (!token) {
         throw new Error('Authentication token not found');
       }
@@ -120,7 +176,6 @@ const LawyerProfileForm = () => {
       console.error('Profile submit error:', err);
       
       if (err.message.includes('token')) {
-        // Clear invalid token and redirect to login
         localStorage.removeItem('token');
         toast.error('Session expired. Please login again');
         navigate('/login');
@@ -131,91 +186,6 @@ const LawyerProfileForm = () => {
       setIsSubmitting(false);
     }
   };
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Error",
-          description: "Please upload an image file",
-          variant: "destructive",
-        });
-        return;
-      }
-      setProfilePic(file);
-    }
-  };
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   setIsSubmitting(true);
-
-  //   try {
-  //     // Validate all fields
-  //     const requiredFields = Object.entries(formData);
-  //     for (const [key, value] of requiredFields) {
-  //       if (!value) {
-  //         throw new Error(`${key.charAt(0).toUpperCase() + key.slice(1)} is required`);
-  //       }
-  //     }
-
-  //     if (!profilePic) {
-  //       throw new Error('Profile picture is required');
-  //     }
-
-  //     // Create FormData instance
-  //     const formDataToSend = new FormData();
-      
-  //     // Append the image with the key 'image'
-  //     formDataToSend.append('image', profilePic);
-      
-  //     // Append all other form fields
-  //     Object.keys(formData).forEach(key => {
-  //       formDataToSend.append(key, formData[key]);
-  //     });
-
-  //     const token = localStorage.getItem('token');
-  //     if (!token) {
-  //       throw new Error('Authentication token not found');
-  //     }
-
-  //     const response = await fetch('/api/profile/set-profile', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Authorization': `Bearer ${token}`,
-  //       },
-  //       body: formDataToSend,
-  //     });
-
-  //     const data = await response.json();
-
-  //     if (!response.ok) {
-  //       throw new Error(data.message || 'Failed to update profile');
-  //     }
-
-  //     toast({
-  //       title: "Success",
-  //       description: "Profile updated successfully!",
-  //     });
-
-  //   } catch (err) {
-  //     toast({
-  //       title: "Error",
-  //       description: err.message,
-  //       variant: "destructive",
-  //     });
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
 
   if (isLoading) {
     return (
@@ -228,12 +198,11 @@ const LawyerProfileForm = () => {
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto mt-16">
       <CardHeader>
         <CardTitle>Update Lawyer Profile</CardTitle>
       </CardHeader>
       <CardContent>
-        {/* Rest of the form JSX remains the same */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Profile Picture</Label>
@@ -333,6 +302,7 @@ const LawyerProfileForm = () => {
             <div className="space-y-2">
               <Label>Enrollment Number</Label>
               <Input 
+                type="text"
                 name="enrollmentNumber"
                 value={formData.enrollmentNumber}
                 onChange={handleInputChange}
@@ -345,6 +315,7 @@ const LawyerProfileForm = () => {
             <div className="space-y-2">
               <Label>District</Label>
               <Input 
+                type="text"
                 name="district"
                 value={formData.district}
                 onChange={handleInputChange}
@@ -355,6 +326,7 @@ const LawyerProfileForm = () => {
             <div className="space-y-2">
               <Label>Taluka</Label>
               <Input 
+                type="text"
                 name="taluka"
                 value={formData.taluka}
                 onChange={handleInputChange}
@@ -365,6 +337,7 @@ const LawyerProfileForm = () => {
             <div className="space-y-2">
               <Label>State</Label>
               <Input 
+                type="text"
                 name="state"
                 value={formData.state}
                 onChange={handleInputChange}
@@ -376,6 +349,7 @@ const LawyerProfileForm = () => {
           <div className="space-y-2">
             <Label>University</Label>
             <Input 
+              type="text"
               name="university"
               value={formData.university}
               onChange={handleInputChange}
@@ -388,7 +362,7 @@ const LawyerProfileForm = () => {
             className="w-full"
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Updating...' : 'Update Profile'}
+            {isSubmitting ? 'Submitting...' : 'Submit'}
           </Button>
         </form>
       </CardContent>

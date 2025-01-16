@@ -11,6 +11,9 @@ import Home from "./pages/Home";
 import Form from "./pages/Form";
 import { toast, Toaster } from 'sonner'
 import CaseCreation from "./pages/CaseCreation";
+import AcceptCase from "./pages/AcceptCase";
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import PrivateRoute from './pages/PrivateRoute';
 // import CaseCreation from "./pages/1";
 // import CaseCreation2 from "./pages/0";
 
@@ -18,26 +21,47 @@ import CaseCreation from "./pages/CaseCreation";
 
 function App() {
   return (
-    <div className="w-screen min-h-screen flex flex-col">
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <div className="w-screen min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/leaderboard" element={<Leaderboard/>}/>
+            <Route path="/providers" element={<Providers/>}/>
+            {/* Client-only Routes */}
+            <Route path="/create-case" element={
+              <PrivateRoute roleRequired="Client">
+                <CaseCreation />
+              </PrivateRoute>
+            } />
 
-      <Navbar/>
-      <main className="flex-1 pt-16">
-      <Routes>
-        <Route path="/" element={<Home />}/>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/providers" element={<Providers />} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/create-case" element={<CaseCreation />} />
-        <Route path='/form' element={<Form />} />
-        {/* <Route path="/create-case2" element={<CaseCreation2 />} /> */}
-      </Routes>
-      </main>
-      <Toaster richColors position="bottom-center" />
+            {/* Provider-only Routes */}
+            <Route path="/form" element={
+              <PrivateRoute roleRequired="Provider">
+                <Form />
+              </PrivateRoute>
+            } />
+            <Route path="/accept-case" element={
+              <PrivateRoute roleRequired="Provider">
+                <AcceptCase />
+              </PrivateRoute>
+            } />
 
-    </div>
+            {/* Protected Routes (any authenticated user) */}
+            <Route path="/dashboard" element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            } />
+          </Routes>
+        </main>
+        <Toaster />
+      </div>
+    </GoogleOAuthProvider>
   );
 }
-
 export default App;
